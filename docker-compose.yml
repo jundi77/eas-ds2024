@@ -1,0 +1,57 @@
+services:
+  redis-joiner:
+    image: redis:7.4.1
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./script/cluster-init.sh:/cluster-init.sh
+      - ./script/start-server-cluster-init.sh:/start-server-cluster-init.sh
+    healthcheck:
+      test: redis-cli ping | grep PONG
+      interval: 1s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      - redis
+    entrypoint: ["sh", "/start-server-cluster-init.sh"]
+
+  redis:
+    image: redis:7.4.1
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./script/start-server.sh:/start-server.sh
+    healthcheck:
+      test: redis-cli ping | grep PONG
+      interval: 1s
+      timeout: 10s
+      retries: 5
+    entrypoint: ["sh", "/start-server.sh"]
+
+  client-1:
+    image: royyana/rm-jupyter-go:1.00
+    user: root
+    ports:
+      - 60001:8888
+      - 20001:20000
+    environment:
+      - "PASSWORD=client-1"
+      - "DOCKER_STACKS_JUPYTER_CMD=lab"
+      - "GRANT_SUDO=yes"
+    volumes:
+      - ./client/workmesin1:/home/jovyan/work
+      - ./script:/script
+    entrypoint: sh /script/client-entrypoint.sh
+
+  client-2:
+    image: royyana/rm-jupyter-go:1.00
+    user: root
+    ports:
+      - 60002:8888
+      - 20002:20000
+    environment:
+      - "PASSWORD=client-2"
+      - "DOCKER_STACKS_JUPYTER_CMD=lab"
+      - "GRANT_SUDO=yes"
+    volumes:
+      - ./client/workmesin2:/home/jovyan/work
+      - ./script:/script
+    entrypoint: sh /script/client-entrypoint.sh
