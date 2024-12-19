@@ -56,6 +56,21 @@ local MESSAGE_TYPES = {
     [10] = "PublishShard"
 }
 
+-- Node Flags
+local CLUSTER_NODE_FLAGS = {
+    [1] = "Master",
+    [2] = "Slave",
+    [4] = "PFAIL",
+    [8] = "FAIL",
+    [16] = "Myself",
+    [32] = "Handshake",
+    [64] = "No Address",
+    [128] = "Meet",
+    [256] = "Migrate To",
+    [512] = "No Failover",
+    [1024] = "Extensions Supported"
+}
+
 -- Dissector function
 function redis_cluster.dissector(buffer, pinfo, tree)
     local length = buffer:len()
@@ -111,7 +126,19 @@ function redis_cluster.dissector(buffer, pinfo, tree)
             gossip_tree:add(fields.data_ip, buffer(gossip_offset + CLUSTER_NAMELEN + 8, NET_IP_STR_LEN))
             gossip_tree:add(fields.data_port, buffer(gossip_offset + CLUSTER_NAMELEN + 8 + NET_IP_STR_LEN, 2))
             gossip_tree:add(fields.data_cport, buffer(gossip_offset + CLUSTER_NAMELEN + 8 + NET_IP_STR_LEN + 2, 2))
-            gossip_tree:add(fields.data_flags, buffer(gossip_offset + CLUSTER_NAMELEN + 8 + NET_IP_STR_LEN + 4, 2))
+            local flags_value = buffer(gossip_offset + CLUSTER_NAMELEN + 8 + NET_IP_STR_LEN + 4, 2):uint()
+            local flags_text = ""
+            for flag, name in pairs(CLUSTER_NODE_FLAGS) do
+                if bit.band(flags_value, flag) ~= 0 then
+                    flags_text = flags_text .. name .. ", "
+                end
+            end
+            if #flags_text > 0 then
+                flags_text = flags_text:sub(1, -3) -- Remove trailing comma and space
+            else
+                flags_text = "None"
+            end
+            gossip_tree:add(fields.data_flags, buffer(gossip_offset + CLUSTER_NAMELEN + 8 + NET_IP_STR_LEN + 4, 2)):append_text(" (" .. flags_text .. ")")
             gossip_tree:add(fields.data_pport, buffer(gossip_offset + CLUSTER_NAMELEN + 8 + NET_IP_STR_LEN + 6, 2))
         end
     elseif msg_type == 4 or msg_type == 10 then  -- Publish, PublishShard
